@@ -16,7 +16,6 @@
     align-items: center;
     position: relative;
     z-index: 1;
-    /* Watermark background */
     background: none;
   }
 
@@ -30,25 +29,28 @@
     opacity: 0.5;
     pointer-events: none;
   }
-
-  main {
-    position: relative;
-    z-index: 1;
-    background: rgba(255,255,255,0.85);
-    border-radius: 12px;
-    padding: 2rem 3rem;
-    box-shadow: 0 2px 16px rgba(0,0,0,0.08);
-    text-align: center;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-  }
   h1 { font-size: 1.25rem; margin-bottom: 10px; }
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); max-width: 480px; }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--gap);
+    max-width: 480px;
+    margin: 0 auto;
+    z-index: 1;
+  }
   .grid > div { padding: 6px; border: 1px solid #ddd; border-radius: 6px; text-align: center; }
   .head { font-weight: 700; background: #f7f7f7; }
   input[type="text"] { width: 100%; border: none; outline: none; text-align: center; font: inherit; }
-  .controls { display: flex; gap: var(--gap); flex-wrap: wrap; margin-top: 14px; }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--gap);
+    margin-top: 14px;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    z-index: 1;
+  }
   button, label > span.btn { padding: 8px 12px; border: 1px solid #ccc; border-radius: 8px; cursor: pointer; background: #fff; }
   button:disabled { opacity: 0.6; cursor: not-allowed; }
   #status { margin-top: 10px; color: #666; white-space: pre-line; }
@@ -58,59 +60,280 @@
 </head>
 <body>
 
-<main>
-  <h1>Red Tails Seat Shuffler</h1>
+<h1>Red Tails Seat Shuffler</h1>
 
-  <div class="grid" id="table">
-    <div class="head">Name / Seat</div>
-    <div class="head">Shuffled POSITION (1–16)</div>
-  </div>
+<div class="grid" id="table">
+  <div class="head">Name / Seat</div>
+  <div class="head">Shuffled POSITION (1–16)</div>
+</div>
 
-  <div class="controls">
-    <button id="shuffleBtn">Shuffle</button>
-    <button id="downloadBtn">Download CSV</button>
+<div class="controls">
+  <button id="shuffleBtn">Shuffle</button>
+  <button id="downloadBtn">Download CSV</button>
 
-    <input id="csvFile" class="file-input" type="file" accept=".csv" />
-    <label for="csvFile"><span class="btn">Load CSV</span></label>
+  <input id="csvFile" class="file-input" type="file" accept=".csv" />
+  <label for="csvFile"><span class="btn">Load CSV</span></label>
 
-    <label style="display:flex; align-items:center; gap:6px;">
-      <input type="checkbox" id="soundToggle" checked />
-      Sound
-    </label>
-  </div>
+  <label style="display:flex; align-items:center; gap:6px;">
+    <input type="checkbox" id="soundToggle" checked />
+    Sound
+  </label>
+</div>
 
-  <div id="status">Left: names. Right: each name's POSITION. 
-  Seat 5 shows CURSED SEAT (CSV stays numeric 5).</div>
+<div id="status">Left: names. Right: each name's POSITION.</div>
 
-  <audio id="player" src="randomizer.ogg" preload="auto"></audio>
-</main>
+<audio id="player" src="randomizer.ogg" preload="auto"></audio>
 
 <script>
+/** Config */
 const N = 16;
+const CSV_NAME = "shuffle.csv";
+const ANIM_MS = 3650;
+const TICK_MS = 100;
+
+/** State */
+let ids = Array.from({length: N}, (_, i) => i + 1);
+let names = ids.map(String);
+let currentPerm = ids.slice();
+let animTimer = null;
+let animUntil = 0;
+
+/** Build UI rows */
 const table = document.getElementById('table');
 const nameInputs = [];
 const posCells = [];
 
-// Add seat rows dynamically
 for (let i = 0; i < N; i++) {
   const nameCell = document.createElement('div');
+  const posCell  = document.createElement('div');
+
   const inp = document.createElement('input');
   inp.type = 'text';
-  inp.value = String(i+1);
-  inp.addEventListener('input', () => {
-    // Optionally update names array if needed
-  });
+  inp.value = names[i];
+  inp.addEventListener('input', () => { names[i] = inp.value.trim() || String(i+1); });
+
   nameCell.appendChild(inp);
   table.appendChild(nameCell);
-  nameInputs.push(inp);
-
-  const posCell = document.createElement('div');
-  posCell.textContent = String(i+1);
   table.appendChild(posCell);
+
+  nameInputs.push(inp);
   posCells.push(posCell);
 }
 
-// ...existing code...
+/** Helpers */
+function derangedShuffle(n = N, maxTries = 20000) {
+  const base = Array.from({length:n}, (_, i) => i+1);
+  let best = null, bestScore = Infinity;
+
+  for (let t=0; t<maxTries; t++) {
+    const perm = base.slice();
+    // Fisher-Yates
+    for (let i = perm.length-1; i > 0; i--) {
+      const j = Math.floor(Math.random()*(i+1));
+      [perm[i], perm[j]] = [perm[j], perm[i]];
+    }
+    // derangement check
+    let fixed = false;
+    for (let i=0;i<n;i++) if (perm[i] === base[i]) { fixed = true; break; }
+    if (fixed) continue;
+
+    const pos = new Map(perm.map((v, idx) => [v, idx]));
+    let violations = 0;
+    for (let k=1; k<n; k++) {
+      if (Math.abs(pos.get(k) - pos.get(k+1)) === 1) violations++;
+    }
+    if (violations === 0) return perm;
+    if (violations < bestScore) { bestScore = violations; best = perm; }
+  }
+  return best;
+}
+
+function updatePositions(perm) {
+  const idToPos = new Map(perm.map((pid, idx) => [pid, idx + 1]));
+  for (let row = 0; row < N; row++) {
+    const pid = row + 1;
+    const pos = idToPos.get(pid) ?? "";
+    const cell = posCells[row];
+    cell.className = "";
+    if (pos === 5) {
+      cell.textContent = "CURSED SEAT (5)";
+      cell.classList.add("cursed");
+    } else {
+      cell.textContent = String(pos);
+    }
+  }
+}
+
+function adjacencyViolations(perm) {
+  const pos = new Map(perm.map((v, idx) => [v, idx]));
+  let v = 0;
+  for (let k=1; k<N; k++) if (Math.abs(pos.get(k) - pos.get(k+1)) === 1) v++;
+  return v;
+}
+
+function setStatus(msg) {
+  document.getElementById('status').textContent = msg;
+}
+
+/** Audio */
+function playClick() {
+  const enabled = document.getElementById('soundToggle').checked;
+  if (!enabled) return;
+  const audio = document.getElementById('player');
+  audio.currentTime = 0;
+  audio.play().catch(() => {/* ignore user-gesture/autoplay issues since button triggers it */});
+}
+
+/** Animation */
+function startAnimation() {
+  if (animTimer) return;
+  // refresh names from inputs
+  for (let i=0; i<N; i++) names[i] = nameInputs[i].value.trim() || String(i+1);
+
+  playClick();
+  setStatus("Scrambling…");
+  const end = Date.now() + ANIM_MS;
+  animUntil = end;
+  document.getElementById('shuffleBtn').disabled = true;
+
+  animTimer = setInterval(() => {
+    if (Date.now() >= animUntil) {
+      clearInterval(animTimer);
+      animTimer = null;
+      const final = derangedShuffle(N);
+      currentPerm = final.slice();
+      updatePositions(final);
+      const score = adjacencyViolations(final);
+      setStatus(score === 0 ? "Shuffle complete!" : `Done. ${score} adjacency violation(s) minimized.`);
+      document.getElementById('shuffleBtn').disabled = false;
+      return;
+    }
+    // lively intermediate permutation
+    const perm = ids.slice();
+    for (let i = perm.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i+1));
+      [perm[i], perm[j]] = [perm[j], perm[i]];
+    }
+    if (Math.random() < 0.25) {
+      const i = Math.floor(Math.random()*N);
+      let j = Math.floor(Math.random()*N);
+      if (i === j) j = (j+1) % N;
+      [perm[i], perm[j]] = [perm[j], perm[i]];
+    }
+    updatePositions(perm);
+  }, TICK_MS);
+}
+
+/** CSV I/O */
+function toCSV(namesArr, perm) {
+  const header = ["PermanentID","Name","ShuffledPosition","NameAtPosition"];
+  const idToPos = new Map(perm.map((pid, idx) => [pid, idx+1]));
+  const rows = [header.join(",")];
+  for (let pid = 1; pid <= N; pid++) {
+    const name = namesArr[pid-1];
+    const pos = idToPos.get(pid) ?? "";
+    const nameAtPos = (typeof pos === "number" && pos >=1 && pos <= N)
+      ? namesArr[perm[pos-1]-1] : "";
+    rows.push([pid, csvEscape(name), pos, csvEscape(nameAtPos)].join(","));
+  }
+  return rows.join("\n");
+}
+function csvEscape(s) {
+  s = String(s ?? "");
+  return (s.includes(",") || s.includes('"') || s.includes("\n"))
+    ? `"${s.replace(/"/g, '""')}"`
+    : s;
+}
+function downloadCSV() {
+  const blob = new Blob([toCSV(names, currentPerm)], {type: "text/csv;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = CSV_NAME;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function parseCSV(text) {
+  // Simple CSV parser for our expected columns
+  const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
+  if (lines.length === 0) return;
+
+  const header = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g,"").toLowerCase());
+  const pidIdx = header.indexOf("permanentid") !== -1 ? header.indexOf("permanentid")
+               : header.indexOf("id") !== -1 ? header.indexOf("id") : -1;
+  const nameIdx = header.indexOf("name");
+  const posIdx = ["shuffledposition","position","pos"].map(k => header.indexOf(k)).find(i => i !== -1);
+
+  const newNames = Array.from({length:N}, (_,i)=> String(i+1));
+  let posToPid = {};
+
+  for (let i=1; i<lines.length; i++) {
+    const row = splitCSVLine(lines[i]);
+    const get = (idx) => (idx >=0 && idx < row.length) ? row[idx] : "";
+    const pidRaw = get(pidIdx);
+    const nameRaw = get(nameIdx);
+    const posRaw = get(posIdx);
+
+    const pid = Number.parseInt(pidRaw, 10);
+    if (Number.isFinite(pid) && pid >=1 && pid <= N) {
+      const nm = (nameRaw || "").trim();
+      if (nm) newNames[pid-1] = nm;
+    }
+    const pos = Number.parseInt(posRaw, 10);
+    if (Number.isFinite(pid) && pid >=1 && pid <= N && Number.isFinite(pos) && pos >=1 && pos <= N) {
+      posToPid[pos] = pid;
+    }
+  }
+
+  names = newNames;
+  for (let i=0;i<N;i++) nameInputs[i].value = names[i];
+
+  if (Object.keys(posToPid).length === N) {
+    currentPerm = Array.from({length:N}, (_,i)=> posToPid[i+1]);
+    updatePositions(currentPerm);
+    setStatus("Loaded CSV (names and exact positions).");
+  } else {
+    updatePositions(currentPerm);
+    setStatus("Loaded CSV (names only).");
+  }
+}
+
+function splitCSVLine(line) {
+  const out = [];
+  let curr = "";
+  let inQuotes = false;
+  for (let i=0;i<line.length;i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (line[i+1] === '"') { curr += '"'; i++; }
+        else { inQuotes = false; }
+      } else curr += ch;
+    } else {
+      if (ch === ',') { out.push(curr); curr = ""; }
+      else if (ch === '"') inQuotes = true;
+      else curr += ch;
+    }
+  }
+  out.push(curr);
+  return out;
+}
+
+/** Wire up controls */
+document.getElementById('shuffleBtn').addEventListener('click', startAnimation);
+document.getElementById('downloadBtn').addEventListener('click', downloadCSV);
+document.getElementById('csvFile').addEventListener('change', (e) => {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => parseCSV(String(reader.result || ""));
+  reader.readAsText(file);
+});
+
+/** Initial render */
+updatePositions(currentPerm);
 </script>
 </body>
 </html>
