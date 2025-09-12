@@ -86,6 +86,30 @@
 </main>
 
 <script>
+const N = 16;
+const table = document.getElementById('table');
+const nameInputs = [];
+const posCells = [];
+
+// Add seat rows dynamically
+for (let i = 0; i < N; i++) {
+  const nameCell = document.createElement('div');
+  const inp = document.createElement('input');
+  inp.type = 'text';
+  inp.value = String(i+1);
+  inp.addEventListener('input', () => {
+    // Optionally update names array if needed
+  });
+  nameCell.appendChild(inp);
+  table.appendChild(nameCell);
+  nameInputs.push(inp);
+
+  const posCell = document.createElement('div');
+  posCell.textContent = String(i+1);
+  table.appendChild(posCell);
+  posCells.push(posCell);
+}
+
 // ...existing code...
 </script>
 </body>
