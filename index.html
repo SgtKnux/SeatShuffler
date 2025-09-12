@@ -27,13 +27,25 @@ body {
   align-items: center;
 }
 #watermark-img {
-  max-width: 60vw;
-  max-height: 80vh;
+  height: 100vh;
+  width: auto;
+  max-width: none;
   opacity: 0.5;
   object-fit: contain;
   pointer-events: none;
   user-select: none;
   display: block;
+}
+.table-window {
+  background: rgba(255,255,255,0.95);
+  border-radius: 18px;
+  box-shadow: 0 4px 32px rgba(0,0,0,0.12);
+  padding: 2rem 2.5rem;
+  margin-bottom: 1.5rem;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 .center-content {
   position: relative;
@@ -92,28 +104,29 @@ input[type="text"] { width: 100%; border: none; outline: none; text-align: cente
 </div>
 <div class="center-content">
   <h1>Red Tails Seat Shuffler</h1>
+  <div class="table-window">
+    <div class="grid" id="table">
+      <div class="head">Name / Seat</div>
+      <div class="head">Shuffled POSITION (1–16)</div>
+    </div>
 
-  <div class="grid" id="table">
-    <div class="head">Name / Seat</div>
-    <div class="head">Shuffled POSITION (1–16)</div>
+    <div class="controls">
+      <button id="shuffleBtn">Shuffle</button>
+      <button id="downloadBtn">Download CSV</button>
+
+      <input id="csvFile" class="file-input" type="file" accept=".csv" />
+      <label for="csvFile"><span class="btn">Load CSV</span></label>
+
+      <label style="display:flex; align-items:center; gap:6px;">
+        <input type="checkbox" id="soundToggle" checked />
+        Sound
+      </label>
+    </div>
+
+    <div id="status">Left: names. Right: each name's POSITION.</div>
+
+    <audio id="player" src="randomizer.ogg" preload="auto"></audio>
   </div>
-
-  <div class="controls">
-    <button id="shuffleBtn">Shuffle</button>
-    <button id="downloadBtn">Download CSV</button>
-
-    <input id="csvFile" class="file-input" type="file" accept=".csv" />
-    <label for="csvFile"><span class="btn">Load CSV</span></label>
-
-    <label style="display:flex; align-items:center; gap:6px;">
-      <input type="checkbox" id="soundToggle" checked />
-      Sound
-    </label>
-  </div>
-
-  <div id="status">Left: names. Right: each name's POSITION.</div>
-
-  <audio id="player" src="randomizer.ogg" preload="auto"></audio>
 </div>
 
 <script>
