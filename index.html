@@ -6,6 +6,7 @@
 <title>Red Tails Seat Shuffler</title>
 <style>
   :root { --gap: 8px; }
+      body::before {background: url('spitfire-watermark.png') no-repeat left stretch; opacity: 0.5;}
   body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 20px; }
   h1 { font-size: 1.25rem; margin-bottom: 10px; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--gap); max-width: 480px; }
@@ -26,7 +27,7 @@
 
 <div class="grid" id="table">
   <div class="head">Name / Seat</div>
-  <div class="head">Shuffled POSITION (1–16)</div>
+  <div class="head">Seats to Shuffle</div>
 </div>
 
 <div class="controls">
