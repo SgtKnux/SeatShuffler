@@ -99,7 +99,7 @@ def play_click_sound(base_dir):
 class ShufflerGUI:
     def __init__(self, root):
         self.root = root
-        root.title("1–16 Shuffler (Names left, POSITION numbers right)")
+        root.title("Red Tails Seat Shuffler")
         self.ids = list(range(1, N+1))
         self.current_perm = self.ids[:]
         self.animating = False
