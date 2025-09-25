@@ -1,7 +1,11 @@
 # SeatShuffler
 This web app was designed to help SNCOA classes quickly shuffle around the seats each week.  The algorithm behind the app attempts to account for students sitting next to each other prior to the shuffle so that students are placed next to new neighbors (this is not preserved across multiple shuffles, just one to the other).
 
-It can be used for other reasons as well, such as determining briefing order, setting up groups for other tasks, and so on.  I hope you find use in it!
+It can be used for other reasons as well, such as determining briefing order, setting up groups for other tasks, and so on.  
+
+Note:  This app does not collect any data of any kind; no cookies or anything.  Any data used is saved to the user's local files (which the user controls), so anyone can use this independently and at the same time without any issues.
+
+I hope you find use in it!
 
 
 ## How to use the Seat Shuffler
