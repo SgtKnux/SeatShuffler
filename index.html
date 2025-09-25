@@ -112,9 +112,16 @@ input[type="text"] { width: 100%; border: none; outline: none; text-align: cente
 <div class="center-content">
   <h1>Red Tails Seat Shuffler</h1>
   <div class="table-window">
+    <div style="display:flex; gap:8px; align-items:center; justify-content:center; margin-bottom:8px;">
+      <label style="display:flex; align-items:center; gap:6px;"><span>Rows:</span>
+        <input type="number" id="rowCountInput" min="1" max="100" value="16" style="width:84px; text-align:center;" />
+      </label>
+      <button id="updateCountBtn">Update seat count</button>
+    </div>
+
     <div class="grid" id="table">
-      <div class="head">Name / Seat</div>
-      <div class="head">Shuffled POSITION (1–16)</div>
+      <div class="head">Name</div>
+      <div class="head">New Position</div>
     </div>
 
     <div class="controls">
@@ -130,7 +137,10 @@ input[type="text"] { width: 100%; border: none; outline: none; text-align: cente
       </label>
     </div>
 
-    <div id="status">Left: names. Right: each name's POSITION.</div>
+    <div id="status"><b>First Time Use: </b> Change the Name column numbers to the student names in those seats (i.e. if John is in the first seat, change 1 to John). 
+      Then click shuffle to get the new positions.  Click Download csv and store it somewhere for next shuffle.
+    <b>Subsequent Use:</b>  Click Load CSV and select the previously downloaded csv file to restore names and previous positions, then click Shuffle to get new positions.</div>
+    </div>
 
     <audio id="player" src="randomizer.ogg" preload="auto"></audio>
   </div>
@@ -138,7 +148,7 @@ input[type="text"] { width: 100%; border: none; outline: none; text-align: cente
 
 <script>
 /** Config */
-const N = 16;
+let N = 16;
 const CSV_NAME = "shuffle.csv";
 const ANIM_MS = 3650;
 const TICK_MS = 100;
@@ -150,26 +160,43 @@ let currentPerm = ids.slice();
 let animTimer = null;
 let animUntil = 0;
 
-/** Build UI rows */
+/** Build UI rows dynamically for current N */
 const table = document.getElementById('table');
 const nameInputs = [];
 const posCells = [];
 
-for (let i = 0; i < N; i++) {
-  const nameCell = document.createElement('div');
-  const posCell  = document.createElement('div');
+function buildTable() {
+  // clear existing
+  table.innerHTML = '';
+  nameInputs.length = 0;
+  posCells.length = 0;
 
-  const inp = document.createElement('input');
-  inp.type = 'text';
-  inp.value = names[i];
-  inp.addEventListener('input', () => { names[i] = inp.value.trim() || String(i+1); });
+  const headName = document.createElement('div'); headName.className = 'head'; headName.textContent = 'Name';
+  const headPos = document.createElement('div'); headPos.className = 'head'; headPos.textContent = 'New Position';
+  table.appendChild(headName);
+  table.appendChild(headPos);
 
-  nameCell.appendChild(inp);
-  table.appendChild(nameCell);
-  table.appendChild(posCell);
+  // ensure arrays are sized
+  ids = Array.from({length: N}, (_, i) => i + 1);
+  names = Array.from({length: N}, (_, i) => names[i] ?? String(i+1));
+  currentPerm = Array.from({length: N}, (_, i) => currentPerm[i] ?? (i+1));
 
-  nameInputs.push(inp);
-  posCells.push(posCell);
+  for (let i = 0; i < N; i++) {
+    const nameCell = document.createElement('div');
+    const posCell  = document.createElement('div');
+
+    const inp = document.createElement('input');
+    inp.type = 'text';
+    inp.value = names[i];
+    inp.addEventListener('input', () => { names[i] = inp.value.trim() || String(i+1); });
+
+    nameCell.appendChild(inp);
+    table.appendChild(nameCell);
+    table.appendChild(posCell);
+
+    nameInputs.push(inp);
+    posCells.push(posCell);
+  }
 }
 
 /** Helpers */
@@ -207,12 +234,14 @@ function updatePositions(perm) {
     const pos = idToPos.get(pid) ?? "";
     const cell = posCells[row];
     cell.className = "";
-    if (pos === 5) {
-      cell.textContent = "CURSED SEAT (5)";
-      cell.classList.add("cursed");
-    } else {
+ 
+    // Deprecated cursed seat feature
+ //   if (pos === 5) {
+ //     cell.textContent = "CURSED SEAT (5)";
+ //     cell.classList.add("cursed");
+ //   } else {
       cell.textContent = String(pos);
-    }
+ //   }
   }
 }
 
@@ -312,11 +341,22 @@ function parseCSV(text) {
   const lines = text.split(/\r?\n/).filter(l => l.trim().length > 0);
   if (lines.length === 0) return;
 
+  // If CSV contains M data rows (excluding header), resize table to M so data isn't cut off
+  const dataRows = Math.max(0, lines.length - 1);
+  if (dataRows > 0) {
+    N = dataRows;
+    const rc = document.getElementById('rowCountInput');
+    if (rc) rc.value = String(N);
+  }
+
   const header = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g,"").toLowerCase());
   const pidIdx = header.indexOf("permanentid") !== -1 ? header.indexOf("permanentid")
                : header.indexOf("id") !== -1 ? header.indexOf("id") : -1;
   const nameIdx = header.indexOf("name");
-  const posIdx = ["shuffledposition","position","pos"].map(k => header.indexOf(k)).find(i => i !== -1);
+  const posIdx = ["shuffledposition","position","pos","shuffled_position","newposition","new_position","new position","nameatposition"].map(k => header.indexOf(k)).find(i => i !== -1);
+
+  // Rebuild table now that N may have changed
+  buildTable();
 
   const newNames = Array.from({length:N}, (_,i)=> String(i+1));
   let posToPid = {};
@@ -328,14 +368,19 @@ function parseCSV(text) {
     const nameRaw = get(nameIdx);
     const posRaw = get(posIdx);
 
-    const pid = Number.parseInt(pidRaw, 10);
-    if (Number.isFinite(pid) && pid >=1 && pid <= N) {
-      const nm = (nameRaw || "").trim();
-      if (nm) newNames[pid-1] = nm;
+    const parsedPid = Number.parseInt(pidRaw, 10);
+    // fallback: use the CSV data-row index as the pid if permanent id missing/invalid
+    const fallbackPid = i; // i starts at 1 for first data row
+    const effectivePid = (Number.isFinite(parsedPid) && parsedPid >= 1) ? parsedPid : fallbackPid;
+
+    const nm = (nameRaw || "").trim();
+    if (effectivePid >=1 && effectivePid <= N && nm) {
+      newNames[effectivePid-1] = nm;
     }
+
     const pos = Number.parseInt(posRaw, 10);
-    if (Number.isFinite(pid) && pid >=1 && pid <= N && Number.isFinite(pos) && pos >=1 && pos <= N) {
-      posToPid[pos] = pid;
+    if (Number.isFinite(pos) && pos >=1 && pos <= N && effectivePid >=1 && effectivePid <= N) {
+      posToPid[pos] = effectivePid;
     }
   }
 
@@ -384,7 +429,19 @@ document.getElementById('csvFile').addEventListener('change', (e) => {
   reader.readAsText(file);
 });
 
+// Row count control wiring
+document.getElementById('updateCountBtn').addEventListener('click', () => {
+  const v = Number.parseInt(document.getElementById('rowCountInput').value, 10);
+  if (!Number.isFinite(v) || v < 1 || v > 200) return setStatus('Invalid row count');
+  N = v;
+  // rebuild table and preserve names/perm as much as possible
+  buildTable();
+  updatePositions(currentPerm);
+  setStatus(`Seat count updated to ${N}.`);
+});
+
 /** Initial render */
+buildTable();
 updatePositions(currentPerm);
 </script>
 </body>
