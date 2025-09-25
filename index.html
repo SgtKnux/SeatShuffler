@@ -17,6 +17,51 @@ body {
   overflow: hidden;
   background: none;
 }
+
+/* Creator badge (top-left) */
+.creator-badge {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  width: 100px;
+  height: 100px;
+  z-index: 6;
+  display: inline-block;
+  border-radius: 8px;
+  overflow: visible;
+}
+.creator-badge img {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+  display: block;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+.creator-badge .tooltip {
+  position: absolute;
+  top: 50%;
+  left: 110px;
+  transform: translateY(-50%) translateY(-6px);
+  background: rgba(255,255,255,0.92);
+  color: #111;
+  padding: 8px 10px;
+  border-radius: 6px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+  font-size: 0.9rem;
+  line-height: 1.2;
+  max-width: 260px;
+  white-space: normal;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease, transform 180ms ease;
+  z-index: 7;
+}
+.creator-badge:hover .tooltip {
+  opacity: 1;
+  transform: translateY(-50%) translateY(0);
+  pointer-events: auto;
+}
 #watermark-container {
   position: fixed;
   top: 0; left: 0; width: 100vw; height: 100vh;
@@ -109,6 +154,10 @@ input[type="text"] { width: 100%; border: none; outline: none; text-align: cente
 <div id="watermark-container">
   <img src="spitfire-watermark.png" alt="watermark" id="watermark-img">
 </div>
+<a class="creator-badge" href="https://www.linkedin.com/in/sspaethe/" target="_blank" rel="noopener noreferrer">
+  <img src="Blue Koala.png" alt="Creator: Sam Spaethe" />
+  <div class="tooltip">Created by Sam Spaethe<br/>https://www.linkedin.com/in/sspaethe/</div>
+</a>
 <div class="center-content">
   <h1>Red Tails Seat Shuffler</h1>
   <div class="table-window">
